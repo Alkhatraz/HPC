@@ -9,7 +9,7 @@ Also, check that jobs under 7 days dont go to the long partition.
 
 Author: alk_
 GNU General Public license
- ]]
+--]]
 
 --General information for making you own slurm job_submit.lua plugins
 --I found these out the hard way
@@ -18,7 +18,7 @@ GNU General Public license
 
 --Arguments for the 2 builtin functions are important
 --slurm.log_user only works when it returns slurm.FAILURE, useful for verbose messages to users
---https://searchcode.com/codesearch/view/74500288/ for list of subfields in job_desc and part_list #Holy hell was this hard to find. Probably better to pull from their github for later values
+--https://searchcode.com/codesearch/view/74500288/ for list of subfields in job_desc and part_list #Holy hell was this hard to find. Probably better to pull from their github for newer values
 --https://github.com/SchedMD/slurm/blob/master/src/plugins/job_submit/lua/job_submit_lua.c
 --slurm.log_debug will log into slurm log and the debug log which is accessible over slurmctld -Dvvvvv , print() also logs there.
 --Slurm API documentation is bad
@@ -87,17 +87,26 @@ end
 
 function slurm_job_submit(job_desc, part_list, submit_uid)
 
-    if(too_short_for_long(job_desc.partition, job_desc.time_limit) == 1) then
+    --This makes sure that programs run in --pty mode, for quick bash scripting on the default cluster with minimal resources pass from the time check
+    --pty sets IO to /dev/null, or in luas case nil
+    if(job_desc.std_in == nil and job_desc.std_out == nil) then
+        return slurm.SUCCESS
+    end
 
-        slurm.log_user("You have requested the partition 'long' for your job, but it is not allowed to run jobs that take less than 7 days in the 'long' partition. Please use a different partition for your job.")
-        return SLURM_INVALID_TIME_LIMIT
-    elseif (job_desc.partition ~= nil) then
+
+    --Default cant be long partition.
+    if (job_desc.partition ~= nil) then
+
+        if(too_short_for_long(job_desc.partition, job_desc.time_limit) == 1) then
+            slurm.log_user("You have requested the partition 'long' for your job, but it is not allowed to run jobs that take less than 7 days in the 'long' partition. Please use a different partition for your job.")
+            return SLURM_INVALID_TIME_LIMIT
+        end
 
         check = check_part_timelimit(part_list, job_desc.partition, job_desc.time_limit)
         if(check == 0) then
             return slurm.SUCCESS
         else
-            s = "You have requested too much time for your job to run on a partition. Maximum for partition '" .. check .. "' is " .. get_partition(part_list,check).max_time .. " minutes and you requested " .. job_desc.time_limit .. " minutes"
+            s = "You have requested too much time or specified no time limit for your job to run on a partition. Maximum for partition '" .. check .. "' is " .. get_partition(part_list,check).max_time .. " minutes and you requested " .. job_desc.time_limit .. " minutes"
             slurm.log_user(s)
             return SLURM_INVALID_TIME_LIMIT
         end
@@ -107,7 +116,7 @@ function slurm_job_submit(job_desc, part_list, submit_uid)
              return slurm.SUCCESS
         end
 
-        s = "You have requested too much time for your job to run on the default partition. The maximum timelimit for the default partition is " .. get_partition(part_list,default_partition(part_list)).max_time  .. " minutes and you requested " .. job_desc.time_limit .. " minutes"
+        s = "You have requested too much time or specified no time limit for your job to run on the default partition. The maximum timelimit for the default partition is " .. get_partition(part_list,default_partition(part_list)).max_time  .. " minutes and you requested " .. job_desc.time_limit .. " minutes"
         slurm.log_user(s)
         return SLURM_INVALID_TIME_LIMIT
     end
