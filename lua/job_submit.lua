@@ -89,7 +89,16 @@ function slurm_job_submit(job_desc, part_list, submit_uid)
 
     --This makes sure that programs run in --pty mode, for quick bash scripting on the default cluster with minimal resources pass from the time check
     --pty sets IO to /dev/null, or in luas case nil
-    if(job_desc.std_in == nil and job_desc.std_out == nil) then
+    --EDIT: So does running anything under srun. stdin and stdout are only defined explicitly or with SBATCH
+    --check the name aswell
+    --It is still possible to run your scripts with srun and kinda ignore the time limit if they are named bash, but
+    --you get no output
+    if(
+    job_desc.std_in == nil and
+    job_desc.std_out == nil and
+    job_desc.std_err == nil and
+    job_desc.script == nil and
+    job_desc.name == "bash") then
         return slurm.SUCCESS
     end
 
