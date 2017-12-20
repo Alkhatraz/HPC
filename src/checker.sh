@@ -7,6 +7,7 @@
 enddate=`openssl s_client -servername $1:443 -connect $1:443 < /dev/null 2>/dev/null | openssl x509 -enddate | grep -i after | cut -d'=' -f 2`
 
 statuscode=`openssl s_client -servername $1:443 -connect $1:443 < /dev/null 2>/dev/null | grep -i "Verify return code" | awk '{print $4}' `
+statusmessage=`openssl s_client -servername $1:443 -connect $1:443 < /dev/null 2>/dev/null | grep -i "Verify return code"  `
 
 enddatenumber=`date -d "$enddate" +%s`
 curdatenumber=`date +%s`
@@ -14,22 +15,23 @@ curdatenumber=`date +%s`
 monthlen=2592000
 weeklen=604800
 frequency=3600
-mailuser="example@example.com" #Email here m8
+mailuser="example@example.com" #Email to receive
+sendinguser="example@sender.com" #Email to send
 
 
 if (( "$monthlen" + "$curdatenumber" > "$enddatenumber" )) ; then
     if (( "$monthlen" + "$curdatenumber" < "$enddatenumber" + "$frequency" )) ; then
-        echo -e "Subject:SSL certificate expiry warning \n\n 1 Month warning, host: $1 \n" | sendmail -f sslchecker@ut.ee $mailuser
+        echo -e "Subject:SSL certificate expiry warning \n\n 1 Month warning, host: $1 \n" | sendmail -f $sendinguser $mailuser
     fi
 fi
 
 if (( "$weeklen" + "$curdatenumber" > "$enddatenumber" )) ; then
     if (( "$weeklen" + "$curdatenumber" < "$enddatenumber" + "$frequency" )) ; then
-        echo -e "Subject:SSL certificate expiry warning \n\n 1 Week warning, host: $1 \n" | sendmail -f sslchecker@ut.ee $mailuser
+        echo -e "Subject:SSL certificate expiry warning \n\n 1 Week warning, host: $1 \n" | sendmail -f $sendinguser $mailuser
     fi
 fi
 
 if (( "$statuscode" != 0 )) ; then
-    echo -e "Subject:SSL cert return code fail \n\n 1 Host: $1 \n" | sendmail -f sslchecker@ut.ee $mailuser
+    echo -e "Subject:SSL cert return code fail \n\n 1 Host: $1 \n $statusmessage \n" | sendmail -f $sendinguser $mailuser
 fi
 
